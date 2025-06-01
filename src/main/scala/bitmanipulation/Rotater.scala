@@ -12,9 +12,11 @@ abstract class AbstractFixedRotater(bitWidth: Int) extends Module {
 
 class FixedRotater(bitWidth: Int, shamt: Int)
     extends AbstractFixedRotater(bitWidth) {
-
-  ??? // TODO: implement Task 1.4 here
-
+      val count = shamt &  (log2Ceil(bitWidth)-1)
+      if(count == 0)
+        io.result:=io.input
+      else
+        io.result:= Cat(io.input(count-1,0),io.input(bitWidth-1,count))
 }
 
 abstract class AbstractSequentialRotater(bitWidth: Int) extends Module {
@@ -31,9 +33,20 @@ class SequentialRotater(bitWidth: Int, generator: () => AbstractFixedRotater)
     extends AbstractSequentialRotater(bitWidth) {
 
   val Rotater = Module(generator())
-
-  Rotater.io <> DontCare
-
-  ??? // TODO: implement Task 1.4 here
+  val reg1 = RegInit(io.shamt)
+  val reg = RegInit(io.input)
+     io.result:= reg
+      io.done:=false.B
+      Rotater.io.input:=reg
+  when(io.start){
+    when(reg1 === 0.U){
+      io.done:= true.B
+    }
+    .otherwise{
+      reg1:=reg1-1.U
+      reg:= Rotater.io.result
+     
+    }
+  }
 
 }
