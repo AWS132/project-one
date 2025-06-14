@@ -45,6 +45,10 @@ class RV32I(
         (io_pc.pc + 4.U)
       )
     }
+    //Ahmed: JAL/JALR
+     is(NEXT_PC_SELECT.ALU_OUT_ALIGNED) {
+      io_pc.pc_wdata := alu.io_alu.result & (~1.U(32.W))
+      }
   }
   io_pc.pc_we := control_unit.io_ctrl.stall === STALL_REASON.NO_STALL
 
