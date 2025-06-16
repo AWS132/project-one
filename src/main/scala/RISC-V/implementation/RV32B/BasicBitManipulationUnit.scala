@@ -23,7 +23,37 @@ class BasicBitManipulationUnit(
   io_trap <> DontCare
 
   leadingZerosCounter.io <> DontCare
+  
 
-  ??? // TODO: implement Task 2.4 here
+  switch(io.instr_type)
+  {
+    is(RISCV_TYPE.clz){
+      io.valid := true
+      leadingZerosCounter.io.input := io_reg.reg_read_data1
+      io_reg.reg_rd := io.instr(11,7)
+      io_reg.reg_write_en := true
+      io_reg.reg_write_data := leadingZerosCounter.io.result
+
+
+    }
+    is(RISCV_TYPE.ctz){
+
+    }
+    is(RISCV_TYPE.cpop){
+
+    }
+    is(RISCV_TYPE.min){
+
+    }
+    is(RISCV_TYPE.minu){
+
+    }
+    is(RISCV_TYPE.max){
+
+    }
+    is(RISCV_TYPE.maxu){
+
+    }
+  }
 
 }
