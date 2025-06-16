@@ -97,8 +97,8 @@ class ControlUnit extends AbstractControlUnit {
         io_ctrl.reg_we := true.B
         io_ctrl.data_req := true.B
         io_ctrl.data_we := false.B
-        io_ctrl.data_be := Fill(2, RISCV_TYPE.getFunct3(io_ctrl.instr_type).asUInt(1)) ## RISCV_TYPE.getFunct3(io_ctrl.instr_type).asUInt(1,0).orR ## 1.U(1.W)
-      }
+        io_ctrl.reg_write_data
+            }
       //Ahmed: JAL/JALR
       is (RISCV_OP.JAL) {
         stalled := STALL_REASON.NO_STALL
