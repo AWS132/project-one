@@ -26,7 +26,7 @@ object Util
       startMut = if (startMut == 0) 1 else 0;
     }
 
-    result.U(bitWidth.U)
+    (result & ((BigInt(1) << bitWidth) - 1)).U(bitWidth.W)
   }
 }
 
