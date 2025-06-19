@@ -163,7 +163,46 @@ class BitPermutationUnit(
     }
     is(RISCV_TYPE.rori)
     {
+      io.valid := true.B
+      io_reg.reg_rd := io.instr(11,7)
+      io_reg.reg_rs1 := io.instr(19,15)
+      io_reg.reg_rs2 := io.instr(24,20)
+
+      io.stall := STALL_REASON.EXECUTION_UNIT
+      rotater.io.input := io_reg.reg_read_data1
+      rotater.io.shamt := io.instr(26,20)
+      rotater.io.start := true.B
+
+      when(rotater.io.done)
+      {
+        io_pc.pc_we := true.B
+        io_pc.pc_wdata := io_pc.pc + 4.U
+        io.stall := STALL_REASON.NO_STALL
+        io_reg.reg_write_en := true.B
+        io_reg.reg_write_data := shuffler.io.result
+      }
+    }
+    is(RISCV_TYPE.rol)
+    {
+      io.valid := true.B
+      io_reg.reg_rd := io.instr(11,7)
+      io_reg.reg_rs1 := io.instr(19,15)
+      io_reg.reg_rs2 := io.instr(24,20)
+
+      io.stall := STALL_REASON.EXECUTION_UNIT
       
+      rotater.io.input := 32.U - io_reg.reg_read_data1
+      rotater.io.shamt := io_reg.reg_read_data2
+      rotater.io.start := true.B
+
+      when(rotater.io.done)
+      {
+        io_pc.pc_we := true.B
+        io_pc.pc_wdata := io_pc.pc + 4.U
+        io.stall := STALL_REASON.NO_STALL
+        io_reg.reg_write_en := true.B
+        io_reg.reg_write_data := shuffler.io.result
+      }
     }
   }
 
