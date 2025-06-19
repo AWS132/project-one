@@ -97,7 +97,6 @@ class ControlUnit extends AbstractControlUnit {
         io_ctrl.reg_we := true.B
         io_ctrl.data_req := true.B
         io_ctrl.data_we := false.B
-        io_ctrl.reg_write_data := 
             }
       //Ahmed: JAL/JALR
       is (RISCV_OP.JAL) {
