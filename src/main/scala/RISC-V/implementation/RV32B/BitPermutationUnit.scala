@@ -149,7 +149,7 @@ class BitPermutationUnit(
       io.stall := STALL_REASON.EXECUTION_UNIT
       
       rotater.io.input := io_reg.reg_read_data1
-      rotater.io.shamt := io_reg.reg_read_data2
+      rotater.io.shamt := io_reg.reg_read_data2(4,0)
       rotater.io.start := true.B
 
       when(rotater.io.done)
@@ -158,7 +158,7 @@ class BitPermutationUnit(
         io_pc.pc_wdata := io_pc.pc + 4.U
         io.stall := STALL_REASON.NO_STALL
         io_reg.reg_write_en := true.B
-        io_reg.reg_write_data := shuffler.io.result
+        io_reg.reg_write_data := rotater.io.result
       }
     }
     is(RISCV_TYPE.rori)
