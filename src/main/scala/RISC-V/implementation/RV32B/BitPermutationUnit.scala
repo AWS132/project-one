@@ -166,7 +166,7 @@ class BitPermutationUnit(
       io_reg.reg_rs1 := io.instr(19,15)
 
       rotater.io.input := io_reg.reg_read_data1
-      rotater.io.shamt := io.instr(26,20)
+      rotater.io.shamt := io.instr(24,20)
       rotater.io.start := true.B
 
       when(rotater.io.done)
