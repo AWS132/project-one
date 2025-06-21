@@ -143,7 +143,56 @@ object PermBuilder {
   def hammingDistance(current: Map[Int, Int], target: Map[Int, Int]): Int = {
     (0 until 32).count(i => current(i) != target(i))
   }
+  
+  private def inversionDistance(cur: Map[Int, Int], tar: Map[Int, Int]): Int = {
+    val targetInverse = tar.map(_.swap)
+    val relative = cur.toArray.sortBy(_._1).map { case (pos, value) => 
+      targetInverse(value) 
+    }
+    var inversions = 0
+    for (i <- relative.indices; j <- (i + 1) until relative.length) {
+      if (relative(i) > relative(j)) inversions += 1
+    }
+    inversions
+  }
+  
+  private def bitPatternDistance(perm1: Map[Int, Int], perm2: Map[Int, Int]): Int = {
+    perm1.map { case (destBit, srcBit) =>
+      val targetDestBit = perm2.find(_._2 == srcBit).map(_._1)
+      targetDestBit match {
+        case Some(target) => math.abs(destBit - target)
+        case None => 32
+      }
+    }.sum
+  }
+  
+  private def weightedDistance(perm1: Map[Int, Int], perm2: Map[Int, Int]): Double = {
+    val hamming = hammingDistance(perm1, perm2)
+    val inversion = inversionDistance(perm1, perm2)
+    val bitPattern = bitPatternDistance(perm1, perm2)
+    
+    0.4 * hamming + 0.3 * inversion + 0.3 * bitPattern
+  }
 
+  
+  private def calculateScore(current: Map[Int, Int], target: Map[Int, Int], instr: String, imm: Int): Double = {
+    val afterApply = applyInstruction(current, instr, imm)
+    val currentDistance = weightedDistance(current, target)
+    val newDistance = weightedDistance(afterApply, target)
+    
+  
+    val improvement = currentDistance - newDistance
+    
+    
+    val bonus = instr match {
+      case "rori" if imm == 1 || imm == 31 => 0.1  // Common rotations
+      case "grevi" if imm == 1 || imm == 2 || imm == 4 || imm == 8 || imm == 16 => 0.1  
+      case "shfli" | "unshfli" if imm == 1 || imm == 2 || imm == 4 || imm == 8 => 0.1  
+      case _ => 0.0
+    }
+    
+    improvement + bonus
+  }
 
   def findCycles(perm: Map[Int, Int]): List[List[Int]] = {
     val visited = mutable.Set[Int]()
@@ -162,7 +211,6 @@ object PermBuilder {
     cycles.toList
   }
 
-  // Apply an instruction and return the resulting permutation
   def applyInstruction(perm: Map[Int, Int], instr: String, imm: Int): Map[Int, Int] = {
     instr match {
       case "grevi" => grev(imm, perm)
@@ -172,61 +220,26 @@ object PermBuilder {
       case _ => perm
     }
   }
-
-  // Calculate score for an instruction based on multiple metrics
-  def calculateScore(currentPerm: Map[Int, Int], targetPerm: Map[Int, Int], 
-                    instr: String, imm: Int): Double = {
-    val resultPerm = applyInstruction(currentPerm, instr, imm)
-    
-    val currentDistance = hammingDistance(currentPerm, targetPerm)
-    val newDistance = hammingDistance(resultPerm, targetPerm)
-    val improvement = currentDistance - newDistance
-    
-    // If no improvement, heavily penalize
-    if (improvement <= 0) return -1000.0
-    
-    // Primary metric: Hamming distance improvement
-    var score = improvement * 100.0
-    
-    // Secondary metric: cycle structure improvement
-    val currentCycles = findCycles(currentPerm)
-    val newCycles = findCycles(resultPerm)
-    val cycleImprovement = currentCycles.map(_.size).sum - newCycles.map(_.size).sum
-    score += cycleImprovement * 10.0
-    
-    // Preference for simpler instructions (tie-breaker)
-    val instrCost = instr match {
-      case "rori" => 0.1
-      case "grevi" => 0.2
-      case "shfli" | "unshfli" => 0.3
-    }
-    score -= instrCost
-    
-    score
-  }
-
   
   def generateCandidates(): List[(String, Int)] = {
     val candidates = mutable.ListBuffer[(String, Int)]()
     
+    // Rotation candidates
     for (i <- 1 until 32) {
       candidates += (("rori", i))
     }
     
-    val grevPatterns = List(1, 2, 3, 4, 5, 6, 7, 8, 12, 15, 16, 24, 31)
+    // Grev candidates - focus on useful patterns
+    val grevPatterns = List(1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14, 15, 16,17,18,19,20,21,22,23, 24,25,26,27,28,29,30, 31)
     for (pattern <- grevPatterns) {
       candidates += (("grevi", pattern))
     }
     
-    
+    // Shuffle candidates
     val shufflePatterns = List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
     for (pattern <- shufflePatterns) {
-      if (pattern == 1 || pattern == 2 || pattern == 4 || pattern == 8) {
-        candidates += (("shfli", pattern))
-      } else {
-        candidates += (("shfli", pattern))
-        candidates += (("unshfli", pattern))
-      }
+      candidates += (("shfli", pattern))
+      candidates += (("unshfli", pattern))
     }
     
     candidates.toList
@@ -245,24 +258,60 @@ object PermBuilder {
     }
   }
 
+  // Fast check for simple patterns
+  private def checkSimplePatterns(perm: Map[Int, Int]): Option[List[String]] = {
+    val rd = "x1" // This will be replaced with actual register
+    
+    // Check for identity
+    if ((0 until 32).forall(i => perm(i) == i)) {
+      return Some(List())
+    }
+    
+    // Check for simple rotation
+    val rotation = (0 until 32).find(r => 
+      (0 until 32).forall(i => perm(i) == (i + r) % 32)
+    )
+    if (rotation.isDefined) {
+      val r = rotation.get
+      if (r != 0) {
+        return Some(List(s"rori $rd, $rd, ${32 - r}"))
+      }
+    }
+    
+    // Check for simple bit reversal patterns
+    if ((0 until 32).forall(i => perm(i) == 31 - i)) {
+      return Some(List(s"grevi $rd, $rd, 31"))
+    }
+    
+    None
+  }
+
   def buildPermutation(rd: Int, rs1: Int, perm: Map[Int, Int]): List[String] = {
+    // Quick check for simple patterns
+    checkSimplePatterns(perm) match {
+      case Some(instructions) => 
+        return instructions.map(_.replace("x1", s"x$rd"))
+      case None => // Continue with general algorithm
+    }
+    
     val instructions = mutable.ListBuffer[String]()
     val instructionHistory = mutable.ListBuffer[(String, Int)]()
-    var currentPerm = perm
-    val identityPerm = (0 until 32).map(i => (i, i)).toMap 
-    
+    var currentPerm = (0 until 32).map(i => (i, i)).toMap
+    val targetPerm = perm  // This is the target we want to achieve
 
     val allCandidates = generateCandidates()
-    var finished = hammingDistance(currentPerm, identityPerm) == 0
+    var maxIterations = 50  // Prevent infinite loops
+    var iteration = 0
     
-    while (!finished) {
-  
+    while (hammingDistance(currentPerm, targetPerm) > 0 && iteration < maxIterations) {
+      iteration += 1
+      
       var bestCandidate: Option[(String, Int)] = None
-      var bestScore: Double = 0.0
+      var bestScore: Double = -1000.0
 
       for ((instr, imm) <- allCandidates) {
         if (!wouldReverse(instr, imm, instructionHistory.toList)) {
-          val score = calculateScore(currentPerm, identityPerm, instr, imm)
+          val score = calculateScore(currentPerm, targetPerm, instr, imm)
           if (score > bestScore) {
             bestScore = score
             bestCandidate = Some((instr, imm))
@@ -271,35 +320,18 @@ object PermBuilder {
       }
 
       bestCandidate match {
-        case Some((instr, imm)) =>
-          
+        case Some((instr, imm)) if bestScore > -100.0 => // Only accept reasonable improvements
           currentPerm = applyInstruction(currentPerm, instr, imm)
           val regName = s"x$rd"
           instructions += s"$instr $regName, $regName, $imm"
           instructionHistory += ((instr, imm))
           
-          
-          finished = hammingDistance(currentPerm, identityPerm) == 0
-          
-        case None =>
-                    finished = true
+        case _ =>
+          // No good candidate found, break to avoid infinite loop
+          iteration = maxIterations
       }
     }
     
-    instructions.reverse.map { instr =>
-      val parts = instr.split(" ")
-      val instrName = parts(0)
-      val reg = parts(1).dropRight(1) // Remove comma
-      val regSrc = parts(2).dropRight(1) // Remove comma  
-      val imm = parts(3).toInt
-      
-      instrName match {
-        case "grevi" => s"grevi $reg, $regSrc, $imm" 
-        case "shfli" => s"unshfli $reg, $regSrc, $imm" 
-        case "unshfli" => s"shfli $reg, $regSrc, $imm" 
-        case "rori" => s"rori $reg, $regSrc, ${(32 - imm) % 32}" 
-        case _ => instr
-      }
-    }.toList
+    instructions.toList
   }
 }
