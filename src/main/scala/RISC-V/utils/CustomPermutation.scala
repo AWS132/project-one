@@ -228,8 +228,7 @@ object PermBuilder {
     for (i <- 1 until 32) {
       candidates += (("rori", i))
     }
-    
-    // Grev candidates - focus on useful patterns
+  
     val grevPatterns = List(1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14, 15, 16,17,18,19,20,21,22,23, 24,25,26,27,28,29,30, 31)
     for (pattern <- grevPatterns) {
       candidates += (("grevi", pattern))
@@ -258,11 +257,9 @@ object PermBuilder {
     }
   }
 
-  // Fast check for simple patterns
-  private def checkSimplePatterns(perm: Map[Int, Int]): Option[List[String]] = {
-    val rd = "x1" // This will be replaced with actual register
-    
-    // Check for identity
+  
+  private def checkSimplePatterns(rd:Int,rs:Int,perm: Map[Int, Int]): Option[List[String]] = {
+
     if ((0 until 32).forall(i => perm(i) == i)) {
       return Some(List())
     }
@@ -274,13 +271,13 @@ object PermBuilder {
     if (rotation.isDefined) {
       val r = rotation.get
       if (r != 0) {
-        return Some(List(s"rori $rd, $rd, ${32 - r}"))
+        return Some(List(s"rori x$rd, x$rs, ${32 - r}"))
       }
     }
     
     // Check for simple bit reversal patterns
     if ((0 until 32).forall(i => perm(i) == 31 - i)) {
-      return Some(List(s"grevi $rd, $rd, 31"))
+      return Some(List(s"grevi $rd, $rs, 31"))
     }
     
     None
@@ -288,9 +285,9 @@ object PermBuilder {
 
   def buildPermutation(rd: Int, rs1: Int, perm: Map[Int, Int]): List[String] = {
     // Quick check for simple patterns
-    checkSimplePatterns(perm) match {
+    checkSimplePatterns(rd,rs1,perm) match {
       case Some(instructions) => 
-        return instructions.map(_.replace("x1", s"x$rd"))
+        return instructions
       case None => // Continue with general algorithm
     }
     
