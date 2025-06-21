@@ -31,7 +31,8 @@ class RV32I(
 
   decoder.io_decoder.instr := io.instr
   io.stall := control_unit.io_ctrl.stall
-
+val funct3 = RISCV_TYPE.getFunct3(instr_type)
+  val rdata = io_data.data_rdata
   // Assign the program counter interface
   io_pc.pc_wdata := io_reset.boot_addr // Default value
   switch(control_unit.io_ctrl.next_pc_select) {
@@ -68,6 +69,19 @@ class RV32I(
     is(REG_WRITE_SEL.PC_PLUS_4) {
       io_reg.reg_write_data := io_pc.pc + 4.U
     }
+    is(REG_WRITE_SEL.MEM_OUT_SIGN_EXTENDED) {
+      io_reg.reg_write_data := MuxLookup(funct3.asUInt, rdata)(Seq(
+    RISCV_FUNCT3.F000.asUInt -> Cat(Fill(24, rdata(7)), rdata(7,0)),   
+    RISCV_FUNCT3.F001.asUInt -> Cat(Fill(16, rdata(15)), rdata(15,0)), 
+    RISCV_FUNCT3.F010.asUInt -> rdata                                   
+  ))
+}
+   is(REG_WRITE_SEL.MEM_OUT_ZERO_EXTENDED) {
+  io_reg.reg_write_data := MuxLookup(funct3.asUInt, rdata)(Seq(
+    RISCV_FUNCT3.F100.asUInt -> Cat(Fill(24, 0.U), rdata(7,0)),        
+    RISCV_FUNCT3.F101.asUInt -> Cat(Fill(16, 0.U), rdata(15,0))        
+  ))
+}
   }
 
   // Assign the control unit inputs

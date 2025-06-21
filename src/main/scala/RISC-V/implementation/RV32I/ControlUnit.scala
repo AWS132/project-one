@@ -89,15 +89,37 @@ class ControlUnit extends AbstractControlUnit {
       }
 
       //Mahmoud: lw/Lb/Lbu/Lh/Lhu
-      is(RISCV_OP.LOAD){
-        stalled := STALL_REASON.EXECUTION_UNIT
-        io_ctrl.alu_control := ALU_CONTROL.ADD
-        io_ctrl.alu_op_1_sel := ALU_OP_1_SEL.RS1
-        io_ctrl.alu_op_2_sel := ALU_OP_2_SEL.IMM
-        io_ctrl.reg_we := true.B
-        io_ctrl.data_req := true.B
-        io_ctrl.data_we := false.B
-            }
+is(RISCV_OP.LOAD) {
+  stalled := STALL_REASON.EXECUTION_UNIT
+  io_ctrl.alu_control := ALU_CONTROL.ADD
+  io_ctrl.alu_op_1_sel := ALU_OP_1_SEL.RS1
+  io_ctrl.alu_op_2_sel := ALU_OP_2_SEL.IMM
+  io_ctrl.reg_we := false.B  
+  io_ctrl.data_req := true.B
+  io_ctrl.data_we := false.B
+  
+  val funct3 = RISCV_TYPE.getFunct3(io_ctrl.instr_type)
+  
+   when(funct3 === RISCV_FUNCT3.F000) {        
+    io_ctrl.data_be := "b0001".U(4.W)
+  }.elsewhen(funct3 === RISCV_FUNCT3.F001) { 
+    io_ctrl.data_be := "b0011".U(4.W)
+  }.elsewhen(funct3 === RISCV_FUNCT3.F010) {  
+    io_ctrl.data_be := "b1111".U(4.W)
+  }.elsewhen(funct3 === RISCV_FUNCT3.F100) {  
+    io_ctrl.data_be := "b0001".U(4.W)
+  }.elsewhen(funct3 === RISCV_FUNCT3.F101) {  
+    io_ctrl.data_be := "b0011".U(4.W)
+  }.otherwise {
+    io_ctrl.data_be := "b0001".U(4.W) 
+  }
+  
+  io_ctrl.reg_write_sel := Mux(
+    (funct3 === RISCV_FUNCT3.F100) || (funct3 === RISCV_FUNCT3.F101), 
+    REG_WRITE_SEL.MEM_OUT_ZERO_EXTENDED,
+    REG_WRITE_SEL.MEM_OUT_SIGN_EXTENDED 
+  )
+}
       //Ahmed: JAL/JALR
       is (RISCV_OP.JAL) {
         stalled := STALL_REASON.NO_STALL
