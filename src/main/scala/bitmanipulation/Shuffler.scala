@@ -19,31 +19,61 @@ class Shuffler(bitWidth: Int) extends AbstractShuffler(bitWidth) {
   stages(0) := io.input
   
   for (stageIdx <- 0 until numStages) {
-    val swapDistance = 1 << stageIdx
+    val swapDistanceRev = 1 << stageIdx
+    val swapDistance = 1 << (numStages - stageIdx - 1)
     
-    val maskBits = (0 until bitWidth).map { bitPos =>
-      val blockSize = swapDistance * 2
+    val maskBitsL = (0 until bitWidth).map { bitPos =>
+      val blockSize = swapDistance * 4
       val posInBlock = bitPos % blockSize
-      if (posInBlock < swapDistance) 1 else 0
-    }
-    val mask = maskBits.zipWithIndex.map { case (bit, idx) => 
+      if (posInBlock >= swapDistance && posInBlock < 2*swapDistance) 1 else 0
+    }.zipWithIndex.map { case (bit, idx) => 
       if (bit == 1) BigInt(1) << idx else BigInt(0)
     }.reduce(_ | _).U(bitWidth.W)
     
-    val patternBit = Mux(io.unshuffle.asBool,
-      io.pattern(numStages - 1 - stageIdx), 
-      io.pattern(stageIdx)
-    )
+    val maskBitsR = (0 until bitWidth).map { bitPos =>
+      val blockSize = swapDistance * 4
+      val posInBlock = bitPos % blockSize
+      if (posInBlock >= 2*swapDistance && posInBlock < 3*swapDistance) 1 else 0
+    }.zipWithIndex.map { case (bit, idx) => 
+      if (bit == 1) BigInt(1) << idx else BigInt(0)
+    }.reduce(_ | _).U(bitWidth.W)
+   
+    val maskBitsLRev = (0 until bitWidth).map { bitPos =>
+      val blockSize = swapDistanceRev * 4
+      val posInBlock = bitPos % blockSize
+      if (posInBlock >= swapDistanceRev && posInBlock < 2*swapDistanceRev) 1 else 0
+    }.zipWithIndex.map { case (bit, idx) => 
+      if (bit == 1) BigInt(1) << idx else BigInt(0)
+    }.reduce(_ | _).U(bitWidth.W)
+     
+    val maskBitsRRev = (0 until bitWidth).map { bitPos =>
+      val blockSize = swapDistanceRev * 4
+      val posInBlock = bitPos % blockSize
+      if (posInBlock >= 2*swapDistanceRev && posInBlock < 3*swapDistanceRev) 1 else 0
+    }.zipWithIndex.map { case (bit, idx) => 
+      if (bit == 1) BigInt(1) << idx else BigInt(0)
+    }.reduce(_ | _).U(bitWidth.W)
     
-    val currentStage = stages(stageIdx)
-    val staticBits = currentStage & ~(mask | (mask << swapDistance))
-    
-    val upperSwapBits = (currentStage >> swapDistance) & mask
-    val lowerSwapBits = currentStage & mask
-    
-    val swappedResult = staticBits | (lowerSwapBits << swapDistance) | upperSwapBits
-    
-    stages(stageIdx + 1) := Mux(patternBit, swappedResult, currentStage)
+    when(io.unshuffle === 1.U) {
+      when(io.pattern(stageIdx)) {
+        stages(stageIdx+1) := (stages(stageIdx) & ~(maskBitsLRev | maskBitsRRev)) | 
+                              (((stages(stageIdx) >> swapDistanceRev) & maskBitsLRev) | 
+                               ((stages(stageIdx) << swapDistanceRev) & maskBitsRRev))
+      }
+      .otherwise {
+        stages(stageIdx+1) := stages(stageIdx) 
+      }
+    }
+    .otherwise {
+      when(io.pattern(numStages - stageIdx - 1)) {
+        stages(stageIdx+1) := (stages(stageIdx) & ~(maskBitsL | maskBitsR)) | 
+                              (((stages(stageIdx) >> swapDistance) & maskBitsL) | 
+                               ((stages(stageIdx) << swapDistance) & maskBitsR))
+      }
+      .otherwise {
+        stages(stageIdx+1) := stages(stageIdx)
+      }
+    }
   }
   
   io.result := stages(numStages)
